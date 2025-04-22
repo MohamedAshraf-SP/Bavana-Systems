@@ -1,0 +1,317 @@
+import { Project, ProjectVariants } from "./../models/projects.js";
+import { generateBarcode } from "../utils/generators.js";
+import { Category } from "../models/categories.js";
+import { deleteFileWithPath } from "../utils/helpers/deleteFile.js";
+import { getCountOfSchema } from "../services/general.js";
+import mongoose from "mongoose";
+import { escapeRegex } from "../utils/regex.js";
+
+
+export const addProject = async (req, res) => {
+    try {
+        const Cat = await Category.findById(req.body.category)
+        // console.log(req.files);
+        if (!Cat) {
+            return res.status(400).json({ error: "برجاء اختيار تصنيف صحيح" });
+        }
+
+        // if (!req.files) {
+        //     return res.status(400).json({ error: "برجاء ارفاق  صور." });
+        // }
+
+        const variants = req.body.variants ? req.body.variants.map((variant) => {
+            const normalizedVariant = Object.assign({}, variant);
+            return {
+                barCode: generateBarcode(),
+                size: normalizedVariant.size,
+                color: normalizedVariant.color,
+                stock: normalizedVariant.stock,
+
+            }
+        }) : [{
+            barCode: generateBarcode(),
+            price: 1,
+            size: "لايوجد",
+            color: "لايوجد",
+            stock: 0
+
+        }]
+
+        // console.log(variants);
+        /// console.log(req.files.mainImage);
+
+        if (!req.files) return res.status(400).json({ error: "error" });
+        if (!req.files?.mainImage) return res.status(400).json({ error: "main image is required" });
+        if (!req.files?.images) return res.status(400).json({ error: "at least one image is reqired" });
+
+
+        const images = req.files ? req.files.images.map(image => {
+            const normalizedImage = Object.assign({}, image);
+            return { url: normalizedImage.path, alt: req.body.name || "project picture" }
+        }) : [];
+
+
+
+        const projectData = {
+            ...req.body,
+            mainImage: { url: req.files.mainImage[0].path, alt: req.body.name || "project picture" },
+            images,
+            variants
+        };
+
+
+        const project = new Project(projectData);
+        await project.save();
+        res.status(201).json(project);
+    } catch (error) {
+        if (error.code === 11000) {
+            // MongoDB duplicate key error
+            return res.status(400).json({ message: "Barcode must be unique!" });
+        }
+        console.log(error);
+        res.status(400).json({ error: error.message });
+    }
+}
+
+
+export const searchVariants = async (req, res) => {
+    try {
+        const { name, categoryId } = req.query;
+
+
+        let filter = {}
+        if (categoryId) filter.category = new mongoose.Types.ObjectId(req.query.categoryId)
+
+        if (name) {
+            filter.$or = [
+                { name: { $regex: escapeRegex(name), $options: 'i' } },
+                { "variants.color": { $regex: escapeRegex(name), $options: 'i' } }
+            ];
+        }
+
+       // console.log(filter);
+
+        const projects = await Project.aggregate([
+            { $unwind: "$variants" },
+            {
+                $match: filter
+            },
+            {
+                $project: {
+                    _id: 0,
+                    project: { $concat: ["$name", " ", "$variants.color", " (", "$variants.size", ")"] },
+                    variantId: "$variants._id",
+                    "avilable items": "$variants.stock",
+                    barCode: "$variants.barCode",
+                    price: "$actualPrice"
+                }
+            }
+        ]);
+
+        res.status(200).json({ projects });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+
+}
+
+export const getProjects = async (req, res) => {
+    try {
+        let { category, minPrice, maxPrice, isFeatured, sort, sortType, page, limit } = req.query;
+        let query = { isDeleted: false };
+        //  console.log(minPrice);
+
+        if (category) query.category = category;
+        if (minPrice) query.price = { ...query.price, $gte: Number(minPrice) };
+        if (maxPrice) query.price = { ...query.price, $lte: Number(maxPrice) };
+        if (isFeatured) query.isFeatured = isFeatured === "true";
+
+        page = Number(page) || 1;
+        limit = Number(limit) || 10;
+        let skip = (page - 1) * limit;
+        //  console.log(limit);
+
+        const sortQuery = sort ? { [sort]: (sortType ? Number(sortType) : 1), updatedAt: -1 } : { updatedAt: -1 };
+        //console.log(sortQuery);
+        const projects = await Project.find(query)
+            .sort(sortQuery)
+            .skip(skip)
+            .limit(limit);
+        const count = await Project.countDocuments(query)
+
+        if (skip == 0) skip = 1
+        const totalPages = Math.ceil(count / limit)
+
+        res.status(200).json({
+            "currentPage": page,
+            "ProjectsCount": count,
+            "totalPages": totalPages,
+            "Projects": projects
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+
+export const getProjectById = async (req, res) => {
+    try {
+        // console.log(req.params.id);
+        const project = await Project.findById(req.params.id)//.populate("category");
+        //console.log(project);
+
+        if (!project || project.isDeleted) return res.status(404).json({ message: "Project not found" });
+        res.json(project);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+
+export const updateProject = async (req, res) => {
+
+    try {
+        const project = await Project.findById(req.params.id)
+        if (!project) {
+            return res.status(404).json({ error: "Project not found" });
+        }
+
+
+        const variants = req.body.variants ? req.body.variants.map((variant) => {
+            const normalizedVariant = Object.assign({}, variant);
+            return {
+                barCode: variant.barCode ? variant.barCode : generateBarcode(),
+                size: normalizedVariant.size,
+                color: normalizedVariant.color,
+                stock: normalizedVariant.stock,
+
+            }
+        }) : project.variants
+
+        if (req.body?.removedImagesPaths) {
+            // Remove images from the project
+            project.images = project.images.filter(image => !req.body.removedImagesPaths.includes(image.url));
+
+
+            // Delete images from storage (optional)
+            req.body.removedImagesPaths.forEach(imagePath => {
+                // console.log(deleteFileWithPath(imagePath))
+            });
+        }
+
+        project.images = req.files?.images ? [...project.images, ...req.files.images.map(image => {
+            return { url: image.path, alt: req.body.name || "project picture" }
+        })] : [...project.images]
+
+        if (req.files?.mainImage) {
+            deleteFileWithPath(project.mainImage.url)
+            project.mainImage = req.files.mainImage ?
+                { url: req.files.mainImage[0].path, alt: req.body.name || "project picture" } : project.mainImage
+        }
+
+        req.body.variants = variants
+
+        Object.assign(project, req.body)
+        await project.save();
+
+        res.json(project);
+    } catch (error) {
+        // console.log(error);
+        res.status(400).json({ error: error.message });
+    }
+
+};
+
+
+export const deleteProject = async (req, res) => {
+    try {
+        const project = await Project.findByIdAndDelete(req.params.id);
+        if (!project) return res.status(404).json({ message: "Project not found" });
+        res.json({ message: "Project deleted", project });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const updateStockByBarcode = async (req, res) => {
+    try {
+        const { barcode, quantity, operation } = req.body;
+
+        const project = await Project.findOne({ "variants.barcode": barcode });
+
+        if (!project) {
+            return res.status(404).json({ message: "Variant not found" });
+        }
+
+        const variant = project.variants.find(v => v.barcode === barcode);
+        if (!variant) {
+            return res.status(404).json({ message: "Variant not found" });
+        }
+        if (operation !== "add" && operation !== "delete") {
+            return res.status(400).json({ message: "Invalid operation" });
+        }
+
+        if (operation == "add") {
+
+            variant.stock += quantity;
+        } else if (operation == "delete") {
+            variant.stock -= quantity;
+        }
+
+
+        await project.save();
+
+        res.status(200).json({ message: "Stock updated successfully", variant });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+export const getCount = async (req, res) => {
+    try {
+        const counts = {
+            acitvePoducts: await Project.countDocuments({ isActive: true }),
+            unactivePoducts: await Project.countDocuments({ isActive: false }),
+            variants: await ProjectVariants.countDocuments()
+            // totalStock: await Project.aggregate([
+            //     { $unwind: "$variants" }, // Flatten the variants array
+            //     { $group: { _id: null, totalStock: { $sum: "$variants.stock" } } }
+            // ])
+        }
+
+        res.status(200).json({ counts });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// **** Hard Delete a Project (Permanently Remove)*****
+// export const deleteProject = async (req, res) => {
+//     try {
+//         const project = await Project.findByIdAndDelete(req.params.id);
+//         if (!project) return res.status(404).json({ message: "Project not found" });
+//         res.json({ message: "Project permanently deleted" });
+//     } catch (error) {
+//         res.status(500).json({ error: error.message });
+//     }
+// };
