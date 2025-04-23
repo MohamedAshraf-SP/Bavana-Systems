@@ -4,7 +4,6 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { run } from "./config/databaseConnection.js";
 import cookieParser from "cookie-parser";
-import "./models/cornJobs/resetVariantsWithdrawDaily.js"
 
 
 

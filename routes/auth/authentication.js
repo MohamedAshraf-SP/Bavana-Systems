@@ -6,7 +6,7 @@ import {
     register
 
 } from "../../controllers/auth.js";
-import { register } from "module";
+
 
 export const authRoute = express.Router();
 

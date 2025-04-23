@@ -1,4 +1,4 @@
-import { Project, ProjectVariants } from "./../models/projects.js";
+import { Project } from "./../models/projects.js";
 import { generateBarcode } from "../utils/generators.js";
 import { Category } from "../models/categories.js";
 import { deleteFileWithPath } from "../utils/helpers/deleteFile.js";
@@ -15,30 +15,8 @@ export const addProject = async (req, res) => {
             return res.status(400).json({ error: "برجاء اختيار تصنيف صحيح" });
         }
 
-        // if (!req.files) {
-        //     return res.status(400).json({ error: "برجاء ارفاق  صور." });
-        // }
 
-        const variants = req.body.variants ? req.body.variants.map((variant) => {
-            const normalizedVariant = Object.assign({}, variant);
-            return {
-                barCode: generateBarcode(),
-                size: normalizedVariant.size,
-                color: normalizedVariant.color,
-                stock: normalizedVariant.stock,
 
-            }
-        }) : [{
-            barCode: generateBarcode(),
-            price: 1,
-            size: "لايوجد",
-            color: "لايوجد",
-            stock: 0
-
-        }]
-
-        // console.log(variants);
-        /// console.log(req.files.mainImage);
 
         if (!req.files) return res.status(400).json({ error: "error" });
         if (!req.files?.mainImage) return res.status(400).json({ error: "main image is required" });
@@ -56,7 +34,7 @@ export const addProject = async (req, res) => {
             ...req.body,
             mainImage: { url: req.files.mainImage[0].path, alt: req.body.name || "project picture" },
             images,
-            variants
+
         };
 
 
@@ -74,7 +52,7 @@ export const addProject = async (req, res) => {
 }
 
 
-export const searchVariants = async (req, res) => {
+export const search = async (req, res) => {
     try {
         const { name, categoryId } = req.query;
 
@@ -85,27 +63,16 @@ export const searchVariants = async (req, res) => {
         if (name) {
             filter.$or = [
                 { name: { $regex: escapeRegex(name), $options: 'i' } },
-                { "variants.color": { $regex: escapeRegex(name), $options: 'i' } }
+
             ];
         }
 
-       // console.log(filter);
+        // console.log(filter);
 
         const projects = await Project.aggregate([
-            { $unwind: "$variants" },
             {
                 $match: filter
             },
-            {
-                $project: {
-                    _id: 0,
-                    project: { $concat: ["$name", " ", "$variants.color", " (", "$variants.size", ")"] },
-                    variantId: "$variants._id",
-                    "avilable items": "$variants.stock",
-                    barCode: "$variants.barCode",
-                    price: "$actualPrice"
-                }
-            }
         ]);
 
         res.status(200).json({ projects });
@@ -179,17 +146,6 @@ export const updateProject = async (req, res) => {
         }
 
 
-        const variants = req.body.variants ? req.body.variants.map((variant) => {
-            const normalizedVariant = Object.assign({}, variant);
-            return {
-                barCode: variant.barCode ? variant.barCode : generateBarcode(),
-                size: normalizedVariant.size,
-                color: normalizedVariant.color,
-                stock: normalizedVariant.stock,
-
-            }
-        }) : project.variants
-
         if (req.body?.removedImagesPaths) {
             // Remove images from the project
             project.images = project.images.filter(image => !req.body.removedImagesPaths.includes(image.url));
@@ -210,8 +166,6 @@ export const updateProject = async (req, res) => {
             project.mainImage = req.files.mainImage ?
                 { url: req.files.mainImage[0].path, alt: req.body.name || "project picture" } : project.mainImage
         }
-
-        req.body.variants = variants
 
         Object.assign(project, req.body)
         await project.save();
@@ -235,49 +189,11 @@ export const deleteProject = async (req, res) => {
     }
 };
 
-export const updateStockByBarcode = async (req, res) => {
-    try {
-        const { barcode, quantity, operation } = req.body;
-
-        const project = await Project.findOne({ "variants.barcode": barcode });
-
-        if (!project) {
-            return res.status(404).json({ message: "Variant not found" });
-        }
-
-        const variant = project.variants.find(v => v.barcode === barcode);
-        if (!variant) {
-            return res.status(404).json({ message: "Variant not found" });
-        }
-        if (operation !== "add" && operation !== "delete") {
-            return res.status(400).json({ message: "Invalid operation" });
-        }
-
-        if (operation == "add") {
-
-            variant.stock += quantity;
-        } else if (operation == "delete") {
-            variant.stock -= quantity;
-        }
-
-
-        await project.save();
-
-        res.status(200).json({ message: "Stock updated successfully", variant });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
 export const getCount = async (req, res) => {
     try {
         const counts = {
-            acitvePoducts: await Project.countDocuments({ isActive: true }),
-            unactivePoducts: await Project.countDocuments({ isActive: false }),
-            variants: await ProjectVariants.countDocuments()
-            // totalStock: await Project.aggregate([
-            //     { $unwind: "$variants" }, // Flatten the variants array
-            //     { $group: { _id: null, totalStock: { $sum: "$variants.stock" } } }
-            // ])
+            acitveProjects: await Project.countDocuments({ isActive: true }),
+            unactiveProjects: await Project.countDocuments({ isActive: false })
         }
 
         res.status(200).json({ counts });
@@ -285,15 +201,6 @@ export const getCount = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
-
-
-
-
-
-
-
-
-
 
 
 

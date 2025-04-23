@@ -1,5 +1,5 @@
 import { Category } from "../models/categories.js";
-import { Product } from "../models/products.js";
+import { Project } from "../models/projects.js";
 import { deleteFileWithPath } from "../utils/helpers/deleteFile.js";
 
 const addCategory = async (req, res) => {
@@ -96,12 +96,12 @@ const deleteCategory = async (req, res) => {
     try {
 
 
-        const checkProducts = await Product.findOne({ category: req.params.id, isDeleted: false });
+        const checkProjects = await Project.findOne({ category: req.params.id, isDeleted: false });
         const checkCategories = await Category.findOne({ category: req.params.id });
 
-        // console.log(checkCategories, checkProducts);
+        // console.log(checkCategories, checkProjects);
 
-        if (checkCategories || checkProducts) return res.status(404).json({ message: "cant delete category associated with another Category or product" });
+        if (checkCategories || checkProjects) return res.status(404).json({ message: "cant delete category associated with another Category or Project" });
 
         const deletedCategory = await Category.findByIdAndDelete(req.params.id);
         if (!deletedCategory) return res.status(404).json({ message: "Category not found" });
