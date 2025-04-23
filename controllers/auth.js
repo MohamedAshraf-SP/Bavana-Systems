@@ -2,40 +2,25 @@ import jwt from "jsonwebtoken"
 import bcrypt from "bcrypt"
 import User from "../models/user.js"
 import { generateRefreshToken, generateAccessToken } from "../utils/jwt.js"
-import { UserObj } from "../utils/generators/validations.js"
+import { UserObj } from "../utils/validations.js"
+import { generateRandomPassword, hashPassword } from "../utils/generators/auth.js"
 
 
-export const register = async (req, res) => {
+export const register = async (req, res, next) => {
     try {
+        req.body.userRole = "client";
         const userObj = UserObj.parse(req.body);
 
-        // Check if user already exists
-        const existingUser = await User.findOne({ $or: [{ userName }, { email }, { phone }] });
-
-
-        if (existingUser.userName == userName) return res.status(400).json({ message: 'User name already exists.' });
-        if (existingUser.userName == email) return res.status(400).json({ message: 'Email already exists.' });
-        if (existingUser.phone == phone) return res.status(400).json({ message: 'Phone already exists.' });
-        if (existingUser) return res.status(400).json({ message: 'User already exists.' });
-
-        // Hash password
-
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-
-        userObj.password = hashedPassword; // Set the hashed password
-        userObj.userRole = "client"; // Set default role to user
-        // Create user
+        userObj.password = await bcrypt.hash(userObj.password, 10);
         const newUser = new User(userObj)
 
         await newUser.save();
 
+
         res.status(201).json({ message: 'User registered successfully; You can login now.' });
 
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Server error.' });
+        next(err)
     }
 }
 
@@ -60,6 +45,36 @@ export const login = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+export const forgetPassword = async (req, res) => {
+    try {
+        // Check if the email exists in the database
+
+        //if (yes)
+        // 
+        //  create reset token and save it to the database with an expiration time
+        //  send email with the reset link
+
+        res.status(200).json({ message: "Email  sent successfully!" });
+    } catch (e) {
+        return res.status(400).json({ message: "Error !!" });
+    }
+};
+export const resetPassword = async (req, res) => {
+    try {
+        //get the token from the request
+        //get the new password from the request body
+        // Check if the reset token is valid and not expired
+        // If valid, hash the new password and update it in the database
+        // Invalidate the reset token after use
+        // Send a success response
+
+        res.status(200).json({ message: "Password reset successfully!" });
+    } catch (e) {
+        return res.status(400).json({ message: "Error resetting the password!!" });
+    }
+};
+
 
 export const refreshToken = async (req, res) => {
     try {

@@ -6,13 +6,11 @@ import { Category } from "./categories.js";
 const projectSchema = new mongoose.Schema({
     title: { type: String, required: true, trim: true },
     urlName: { type: String },
-    mainImage: { url: { type: String, required: true }, alt: { type: String } },     // required: true, trim: true},
     description: { type: String, required: true },
-    category: { type: mongoose.Schema.Types.ObjectId, ref: "Category" },//,required: true
-  
     badge: String,
+    category: { type: mongoose.Schema.Types.ObjectId, ref: "Category" },//,required: true
     price: {
-        type: Number, required: true, default: 0,
+        type: Number, required: false, default: 0,
         validate: {
             validator: function (price) {
                 return (price > 1 && price < 999999)// Ensure at least one variant exists
@@ -20,14 +18,12 @@ const projectSchema = new mongoose.Schema({
             message: "\nلا يمكن ان يكون السعر اقل من1 و اكثر من999999 \n",
         }
     },
-    discount: { type: Number, required: true, default: 0 },
-    actualPrice: { type: Number, required: true, default: 0 },
-
-    // stock: { type: Number, required: true, min: 0 },
+   
+    mainImage: { url: { type: String, required: true }, alt: { type: String } },
     images: [
         { url: { type: String, required: true }, alt: { type: String } }
     ],
-    
+
     tags: [
         { type: String }
     ],
@@ -43,17 +39,14 @@ const projectSchema = new mongoose.Schema({
             createdAt: { type: Date, default: Date.now }
         }
     ],
-  
+
     isFeatured: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
     isDeleted: { type: Boolean, default: false }
 },
     { timestamps: true });
 
-projectSchema.pre("save", function (next) {
-    this.actualPrice = Math.ceil(this.price - (this.discount / 100 * this.price));
-    next();
-});
+
 
 
 projectSchema.set("toJSON", { virtuals: true });

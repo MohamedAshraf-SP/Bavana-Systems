@@ -3,7 +3,9 @@ import {
     login,
     refreshToken,
     logout,
-    register
+    register,
+    forgetPassword,
+    resetPassword
 
 } from "../../controllers/auth.js";
 
@@ -11,6 +13,9 @@ import {
 export const authRoute = express.Router();
 
 authRoute.post("/login", login);
+authRoute.post("/register", register);
+authRoute.post("/forget-password", forgetPassword);
+authRoute.post("/reset-password", resetPassword);
 authRoute.post("/register", register);
 authRoute.post("/refreshToken", refreshToken);
 authRoute.get("/logout", logout);

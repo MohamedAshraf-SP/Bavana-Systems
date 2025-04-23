@@ -9,6 +9,7 @@ import cookieParser from "cookie-parser";
 
 import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { errorHandler } from "./middlewares/errorHandling.js";
 //Get the filename and directory
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -54,12 +55,15 @@ try {
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use("/api", router);
 
+app.use("/api", router);
+app.use(errorHandler);
 
 app.use("*", (req, res) => {
   res.status(404).send("ERROR  404   Page not found!!")
 });
+
+
 
 
 

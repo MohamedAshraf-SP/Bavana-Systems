@@ -34,7 +34,8 @@ export const addReview = async (req, res) => {
  */
 export const getReviews = async (req, res) => {
     try {
-        const project = await Project.findById(req.params.id).select("reviews");
+        const project = await Project.findById(req.params.id).select("-_id reviews");
+        console.log(project);
         if (!project) return res.status(404).json({ message: "منتج غير موجود" });
 
         res.status(200).json(project.reviews);

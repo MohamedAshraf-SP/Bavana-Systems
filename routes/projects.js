@@ -23,7 +23,7 @@ const uploadFields = upload.fields([
 
 
 projectsRoute.get("/counts", getCount);
-projectsRoute.get("/search", (req,res)=>{return res.status(200).json({message:"search"})});
+projectsRoute.get("/search", (req, res) => { return res.status(200).json({ message: "search" }) });
 projectsRoute.get("/:id", getProjectById);
 projectsRoute.get("/", getProjects);
 
