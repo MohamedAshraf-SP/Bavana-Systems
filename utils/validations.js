@@ -1,4 +1,5 @@
-import { z } from 'zod';
+import { boolean, z } from 'zod';
+import mongoose from 'mongoose';
 export const UserObj = z.object({
     userName: z.string().min(3),
     password: z.string().min(6),
@@ -25,3 +26,31 @@ export const UserObj = z.object({
     userType: z.enum(['individual', 'company']),
 });
 //.
+
+export const projectObj = z.object({
+
+    title: z.string().min(3),
+    urlName: z.string().optional(),
+    description: z.string().min(3),
+    badge: z.string().min(3).optional(),
+    category: z.string().refine((val) => mongoose.Types.ObjectId.isValid(val), {
+        message: "Invalid ObjectId"
+    }),//,required: true
+    price: z.string().refine((val) => val > 0, { message: "price must be more than 0!" }).optional().transform((val) => Number(val)),
+
+
+    //mainImage: z.array(z.any()).min(1, "mainImage is required"),
+    //images: z.array(z.any()).max(5, "upload max 5 images").optional(),
+    tags: z.array(z.string()).optional(),
+
+    isFeatured: z.any().default(false).transform((val) => val === boolean(val)),
+    isActive: z.any().transform((val) => val === boolean(val)),
+    isDeleted: z.any().transform((val) => val === boolean(val)),
+
+}
+
+
+)
+
+
+

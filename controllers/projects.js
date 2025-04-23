@@ -5,17 +5,21 @@ import { deleteFileWithPath } from "../utils/helpers/deleteFile.js";
 import { getCountOfSchema } from "../services/general.js";
 import mongoose from "mongoose";
 import { escapeRegex } from "../utils/regex.js";
+import { projectObj } from "../utils/validations.js";
+import { errorHandler } from "../middlewares/errorHandling.js";
 
 
-export const addProject = async (req, res) => {
+export const addProject = async (req, res,next) => {
     try {
+        projectObj.parse(req.body);
         const Cat = await Category.findById(req.body.category)
         // console.log(req.files);
         if (!Cat) {
             return res.status(400).json({ error: "برجاء اختيار تصنيف صحيح" });
         }
 
-
+        console.log(req.files.mainImage);
+        console.log(req.files.images);
 
 
         if (!req.files) return res.status(400).json({ error: "error" });
@@ -42,12 +46,7 @@ export const addProject = async (req, res) => {
         await project.save();
         res.status(201).json(project);
     } catch (error) {
-        if (error.code === 11000) {
-            // MongoDB duplicate key error
-            return res.status(400).json({ message: "Barcode must be unique!" });
-        }
-        console.log(error);
-        res.status(400).json({ error: error.message });
+        next(error)
     }
 }
 
@@ -144,6 +143,7 @@ export const updateProject = async (req, res) => {
         if (!project) {
             return res.status(404).json({ error: "Project not found" });
         }
+
 
 
         if (req.body?.removedImagesPaths) {
