@@ -24,3 +24,4 @@ export const UserObj = z.object({
     userRole: z.enum(['admin', 'user', 'client']),
     userType: z.enum(['individual', 'company']),
 });
+//.
